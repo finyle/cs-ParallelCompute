@@ -1,0 +1,82 @@
+
+1. 多核cpu的性能分析： 理解现代多核cpu实现并行任务执行的两个重要组成部分： 单核内的SIMD执行; 多核并行执行
+环境依赖 ispc:
+ wget https://github.com/ispc/ispc/releases/download/v1.16.1/ispc-v1.16.1-linux.tar.gz
+ tar -xvf ispc-v1.16.1-linux.tar.gz
+ export PATH=$PATH:${HOME}/Downloads/ispc-v1.16.1-linux/bin (不生效,
+ 修改 /etc/profile: sudo vi /etc/profile && export PATH=$PATH:/home/lin/ispc-v1.16.1-linux/bin
+
+1.1 多线程实现分形图片绘制( 序列计算 并发计算)
+make && ./mandelbrot
+
+1.2 使用SIMD内联函数向量化代码: 实现向量化版本`clampedExpSerial` 在 `clampedExpVector
+make && ./myexp -s 10000
+
+1.3 使用 ispc 实现并行计算 分形图片绘制： mandelbrot
+随着 glibc 2.32 的发布，Linux 系统删除了sys/sysctl.h, 注释common/tasksys.cpp 82行#include <sys/sysctl.h>
+make && ./mandelbrot.ispc
+
+1.4 使用 ispc 实现 sqrt 计算
+make && ./sart
+
+1.5 使用 ispc 实现 saxpy 计算
+make && ./saxpy
+
+*******************************************************
+
+2. 实现并行行任务库2部分： 异步任务launch， 支持任务图执行
+cpp 并发编程primer  tutorial: 线程创建, 锁, 条件变量, atomic
+
+2.1 异步任务执行 part_a
+make && ./runtasks 8 mandelbrot_chunked
+
+2.2 图任务执行 part_b
+make && ./runtasks 8 mandelbrot_chunked
+
+grade: tests
+python run_test_harness
+
+******************************************************
+
+3. 实现cuda的并行计算加速3部分： saxpy, prefixSum, circle render
+环境依赖： windows nvcc( wsl 环境无法安装 nVidia 驱动, 遂在windows环境中完成)
+         powershell 中安装choco, 安装make, 重新编写windows下环境的makefile 脚本文件 choco install make
+         nvcc 依赖 cl 编译器, 下载visual studio2022(仅支持 nvcc12.4 及以上版本)
+         https://developer.nvidia.com/cuda-downloads?target_os=Windows&target_arch=x86_64&target_version=10&target_type=exe_local
+wsl:
+ apt install nvidia-cuda-toolkit &&  nvcc --version #  安装nvcc; 编译器
+ sudo apt install xserver-xorg # 安装驱动依赖
+ sudo apt install nvidia-utils-510 && nvidia-smi 安装nvidia GPU驱动,否则成功编译后执行会found 0 CUDA device
+
+3.1 saxpy 熟悉 cuda 编程 saxpy
+make && ./cudaSaxpy
+
+3.2 cuda 并行计算前缀和 scan
+C++版本的问题，从下面的输出可以看出来nvcc在编译的时候使用了C++/11的头文件，因此不支持c++17下面的特性: error: parameter packs not expanded with ‘...’
+需要对g++和gcc进行降级: sudo apt install gcc-10 g++-10 && gcc-10
+
+make && ./cudaScan
+
+3.3 基于cuda 的circle渲染器 render
+环境依赖 GL:
+ sudo apt-get install libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev
+ sudo apt-install freeglut3-dev
+
+make && ./render fireworks
+
+
+******************************************************
+4. 实现两个并行算法：bfs图遍历 , pagerank
+
+pagerank: 图遍历并计数边,点个数
+make all & ./pr ../tools/smallGraph
+
+bfs:
+tools/ 提供生成用于测试的图 text2bin 生成工具：将text文本描述生成bin格式的文件，并实现遍历结果
+make main && ./graphTools text2bin plaintext.graph smallGraph && ./graphTools edgestats smallGraph
+
+bfs/grade 提供真实图(包含上百万个点和边)数据：http://cs149.stanford.edu/cs149asstdata/all_graphs.tgz
+make all && ./bfs 4 ../tools/smallGraph && ./bfs_grader 4 ../../../../Downloads/all_graphs/ (并行算法在数秒内完成)
+
+
+
